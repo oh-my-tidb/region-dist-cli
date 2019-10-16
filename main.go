@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -10,30 +11,22 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/pingcap/kvproto/pkg/metapb"
-	"github.com/pingcap/kvproto/pkg/pdpb"
-	"github.com/pingcap/pd/table"
 )
 
 var pd = flag.String("pd", "http://127.0.0.1:2379", "pd address")
 
-type RegionInfo struct {
-	ID          uint64              `json:"id"`
-	StartKey    string              `json:"start_key"`
-	EndKey      string              `json:"end_key"`
-	RegionEpoch *metapb.RegionEpoch `json:"epoch,omitempty"`
-	Peers       []*metapb.Peer      `json:"peers,omitempty"`
+type Peer struct {
+	Id        uint64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	StoreId   uint64 `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	IsLearner bool   `protobuf:"varint,3,opt,name=is_learner,json=isLearner,proto3" json:"is_learner,omitempty"`
+}
 
-	Leader          *metapb.Peer      `json:"leader,omitempty"`
-	DownPeers       []*pdpb.PeerStats `json:"down_peers,omitempty"`
-	PendingPeers    []*metapb.Peer    `json:"pending_peers,omitempty"`
-	WrittenBytes    uint64            `json:"written_bytes,omitempty"`
-	ReadBytes       uint64            `json:"read_bytes,omitempty"`
-	WrittenKeys     uint64            `json:"written_keys,omitempty"`
-	ReadKeys        uint64            `json:"read_keys,omitempty"`
-	ApproximateSize int64             `json:"approximate_size,omitempty"`
-	ApproximateKeys int64             `json:"approximate_keys,omitempty"`
+type RegionInfo struct {
+	ID       uint64  `json:"id"`
+	StartKey string  `json:"start_key"`
+	EndKey   string  `json:"end_key"`
+	Peers    []*Peer `json:"peers,omitempty"`
+	Leader   *Peer   `json:"leader,omitempty"`
 }
 
 type RegionsInfo struct {
@@ -116,7 +109,7 @@ func print(stores []*StoreInfo, regions []*RegionInfo) {
 		field(maxRegionIDLen, "R"+strconv.FormatUint(region.ID, 10), "")
 	STORE:
 		for i, s := range stores {
-			if s.Store.ID == region.Leader.GetStoreId() {
+			if region.Leader != nil && s.Store.ID == region.Leader.StoreId {
 				field(storeLen[i], "▀", "\u001b[31m")
 				continue
 			}
@@ -143,8 +136,8 @@ func convertKey(k string) string {
 	if err != nil {
 		return k
 	}
-	_, d, err := table.DecodeBytes(b)
-	if err != nil {
+	d, ok := decodeBytes(b)
+	if !ok {
 		return k
 	}
 	return strings.ToUpper(hex.EncodeToString(d))
@@ -170,4 +163,23 @@ func field(l int, s string, color string) {
 	if color != "" {
 		fmt.Print("\u001b[0m")
 	}
+}
+
+const (
+	encGroupSize = 8
+	encMarker    = byte(0xFF)
+	encPad       = byte(0x0)
+)
+
+func decodeBytes(b []byte) ([]byte, bool) {
+	var buf bytes.Buffer
+	for len(b) >= 9 {
+		if p := 0xff - b[8]; p >= 0 && p <= 8 {
+			buf.Write(b[:8-p])
+			b = b[9:]
+		} else {
+			return nil, false
+		}
+	}
+	return buf.Bytes(), len(b) == 0
 }
