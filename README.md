@@ -3,6 +3,8 @@ region-dist-cli
 
 Visualize region distribution of a [TiDB](https://github.com/pingcap/tidb) Cluster.
 
+![Screenshot](screenshot.png)
+
 Screen record:
 https://asciinema.org/a/hwmxyMkpoQioTqEtmCHAtiUPM
 
