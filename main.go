@@ -165,12 +165,6 @@ func field(l int, s string, color string) {
 	}
 }
 
-const (
-	encGroupSize = 8
-	encMarker    = byte(0xFF)
-	encPad       = byte(0x0)
-)
-
 func decodeBytes(b []byte) ([]byte, bool) {
 	var buf bytes.Buffer
 	for len(b) >= 9 {
