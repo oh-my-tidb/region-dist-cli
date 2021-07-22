@@ -1,4 +1,4 @@
-package main
+package command
 
 import (
 	"encoding/json"
@@ -7,7 +7,47 @@ import (
 	"time"
 
 	"github.com/360EntSecGroup-Skylar/excelize/v2"
+	"github.com/spf13/cobra"
 )
+
+// NewHotRegionCommand
+func NewHotRegionCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "hot",
+		Short: "show hot region info of the cluster",
+	}
+	cmd.AddCommand(newHotExportCommand())
+	return cmd
+}
+
+func newHotExportCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "export regions info ",
+		Run:   ShowRegionDistributionFnc,
+	}
+	return cmd
+}
+func ShowRegionDistributionFnc(cmd *cobra.Command, args []string) {
+	stores, err := GetStoresInfo(cmd)
+	if err != nil {
+		cmd.Printf("get stores info error :%s \n", err)
+	}
+	regions, err := GetRegionsInfo(cmd)
+	if err != nil {
+		cmd.Printf("get regions info error :%s \n", err)
+	}
+	pd := getEndpoints(cmd)
+	export := NewHotRegionExport(pd[0], stores, regions)
+	err = export.prepare()
+	if err != nil {
+		cmd.Printf("get regions info error :%s \n", err)
+	}
+	err = export.export()
+	if err != nil {
+		cmd.Printf("get regions info error :%s \n", err)
+	}
+}
 
 type StoreInfos struct {
 	StoreHotPeersStat *StoreHotPeersInfos
@@ -43,7 +83,7 @@ type HotPeerStatShow struct {
 	LastUpdateTime time.Time `json:"last_update_time"`
 }
 
-func NewHotRegionExport(pd string, stores StoresInfo, regions RegionsInfo) *StoreInfos {
+func NewHotRegionExport(pd string, stores *StoresInfo, regions *RegionsInfo) *StoreInfos {
 	storeDic := mapStore(stores)
 	regionDic := mapRegion(regions)
 	return &StoreInfos{
@@ -69,7 +109,7 @@ func (h *StoreInfos) prepare() error {
 	return nil
 }
 
-func mapStore(stores StoresInfo) map[uint64]int {
+func mapStore(stores *StoresInfo) map[uint64]int {
 	dic := make(map[uint64]int, len(stores.Stores))
 	for i, v := range stores.Stores {
 		dic[v.Store.ID] = i
@@ -78,7 +118,7 @@ func mapStore(stores StoresInfo) map[uint64]int {
 }
 
 // mapRegion returns the relationship between region leader and stores
-func mapRegion(regions RegionsInfo) map[uint64]*RegionInfo {
+func mapRegion(regions *RegionsInfo) map[uint64]*RegionInfo {
 	rst := make(map[uint64]*RegionInfo, len(regions.Regions))
 	for _, v := range regions.Regions {
 		rst[v.ID] = v
@@ -125,9 +165,9 @@ func (h *StoreInfos) export() error {
 
 			regionInfo := h.regionDic[region.RegionID]
 			// set read metrics
-			a = string('B'+count+8) + strconv.Itoa(regionCount)
+			a = string('B'+count+7) + strconv.Itoa(regionCount)
 			f.SetCellStr("hot region", a, regionInfo.StartKey)
-			a = string('B'+count+9) + strconv.Itoa(regionCount)
+			a = string('B'+count+8) + strconv.Itoa(regionCount)
 			f.SetCellStr("hot region", a, regionInfo.EndKey)
 
 			for _, peer := range regionInfo.Peers {

@@ -1,88 +1,46 @@
-package main
+package command
 
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
-	"flag"
 	"fmt"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/spf13/cobra"
 )
 
-var pd = flag.String("pd", "http://172.16.4.3:35434", "pd address")
-
-type Peer struct {
-	Id        uint64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	StoreId   uint64 `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	IsLearner bool   `protobuf:"varint,3,opt,name=is_learner,json=isLearner,proto3" json:"is_learner,omitempty"`
+// NewHotRegionCommand
+func NewRegionCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "region",
+		Short: "show  region info of the cluster",
+	}
+	cmd.AddCommand(newRegionPrintCommand())
+	return cmd
 }
 
-type RegionInfo struct {
-	ID       uint64  `json:"id"`
-	StartKey string  `json:"start_key"`
-	EndKey   string  `json:"end_key"`
-	Peers    []*Peer `json:"peers,omitempty"`
-	Leader   *Peer   `json:"leader,omitempty"`
+// newRegionPrintCommand
+func newRegionPrintCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "print",
+		Short: "print  regions info ",
+		Run:   PrintRegionsInfo,
+	}
+	return cmd
 }
 
-type RegionsInfo struct {
-	Count   int           `json:"count"`
-	Regions []*RegionInfo `json:"regions"`
-}
-
-type StoreInfo struct {
-	Store struct {
-		ID uint64 `json:"id"`
-	} `json:"store"`
-}
-
-type StoresInfo struct {
-	Stores []*StoreInfo `json:"stores"`
-}
-
-func main() {
-	res, err := http.Get(*pd + "/pd/api/v1/stores")
+func PrintRegionsInfo(cmd *cobra.Command, _ []string) {
+	stores, err := GetStoresInfo(cmd)
 	if err != nil {
-		fmt.Println(err)
-		return
+		cmd.Printf("get stores info error :%s \n", err)
 	}
-	defer res.Body.Close()
-	var stores StoresInfo
-	err = json.NewDecoder(res.Body).Decode(&stores)
+	regions, err := GetRegionsInfo(cmd)
 	if err != nil {
-		fmt.Println(err)
-		return
+		cmd.Printf("get regions info error :%s \n", err)
 	}
-
-	res, err = http.Get(*pd + "/pd/api/v1/regions")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer res.Body.Close()
-	var regions RegionsInfo
-	err = json.NewDecoder(res.Body).Decode(&regions)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	export := NewHotRegionExport(*pd, stores, regions)
-	err = export.prepare()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	err = export.export()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
 	print(stores.Stores, regions.Regions)
 }
 
