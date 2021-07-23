@@ -156,9 +156,8 @@ func (h *StoreInfos) export() error {
 			a = string('B'+count) + strconv.Itoa(regionCount)
 			f.SetCellInt("hot region", a, h.storeDic[uint64(storeID)])
 
-			// set metrics
-			for k, v := range []float64{region.ByteRate, region.ByteRate, region.ByteRate,
-				region.ByteRate, region.ByteRate, region.ByteRate} {
+			// set  read metrics
+			for k, v := range []float64{region.ByteRate, region.KeyRate, region.QueryRate} {
 				a = string('B'+count+k+1) + strconv.Itoa(regionCount)
 				f.SetCellFloat("hot region", a, v, 2, 32)
 			}
