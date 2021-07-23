@@ -26,7 +26,7 @@ var defaultHotType = Read
 func NewHotRegionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hot",
-		Short: "show hot region info of the cluster,default hot type is read",
+		Short: "export hot region info of the cluster",
 	}
 	cmd.AddCommand(
 		newReadHotExportCommand(),
