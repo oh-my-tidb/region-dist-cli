@@ -1,3 +1,4 @@
 region-dist-cli
 *.xlsx
 *.idea
+*.csv
