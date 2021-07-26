@@ -9,8 +9,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/360EntSecGroup-Skylar/excelize/v2"
+
 	"github.com/spf13/cobra"
 )
+
+var stores string
 
 // NewHotRegionCommand
 func NewRegionCommand() *cobra.Command {
@@ -18,7 +22,10 @@ func NewRegionCommand() *cobra.Command {
 		Use:   "region",
 		Short: "show  region info of the cluster",
 	}
-	cmd.AddCommand(newRegionPrintCommand())
+	cmd.AddCommand(
+		newRegionPrintCommand(),
+		newRegionExportCommand())
+	cmd.PersistentFlags().StringVarP(&stores, "stores", "s", "", "store")
 	return cmd
 }
 
@@ -28,6 +35,16 @@ func newRegionPrintCommand() *cobra.Command {
 		Use:   "print",
 		Short: "print  regions info ",
 		Run:   PrintRegionsInfo,
+	}
+	return cmd
+}
+
+// newRegionPrintCommand
+func newRegionExportCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "export  regions info ",
+		Run:   ExportRegionsInfo,
 	}
 	return cmd
 }
@@ -42,6 +59,67 @@ func PrintRegionsInfo(cmd *cobra.Command, _ []string) {
 		cmd.Printf("get regions info error :%s \n", err)
 	}
 	print(stores.Stores, regions.Regions)
+}
+
+func ExportRegionsInfo(cmd *cobra.Command, _ []string) {
+	stores, err := GetStoresInfo(cmd)
+	if err != nil {
+		cmd.Printf("get stores info error :%s \n", err)
+	}
+	regions, err := GetRegionsInfo(cmd)
+	if err != nil {
+		cmd.Printf("get regions info error :%s \n", err)
+	}
+	if err = export(stores, regions); err != nil {
+		cmd.Printf("export region error :%s \n", err)
+	}
+}
+
+func export(stores *StoresInfo, regions *RegionsInfo) error {
+	f := excelize.NewFile()
+	storeMap := mapStore(stores)
+	sheetName := "region"
+	sheet := f.NewSheet(sheetName)
+	f.SetCellValue("hot region", "A2", "test")
+	count := len(stores.Stores)
+
+	a := string('B'+int8(count)) + strconv.Itoa(1)
+	// record data
+	for storeId, idx := range storeMap {
+		a = string('B'+idx) + strconv.Itoa(1)
+		f.SetCellInt(sheetName, a, int(storeId))
+	}
+
+	for k, v := range []string{"leader", "start_key", "end_key", "table", "is_index"} {
+		a = string('B'+int8(count+k)) + strconv.Itoa(1)
+		f.SetCellStr(sheetName, a, v)
+	}
+
+	for i, region := range regions.Regions {
+		// set regionID
+		a = string('A') + strconv.Itoa(i+2)
+		f.SetCellInt(sheetName, a, int(region.ID))
+
+		// set region leader
+		a = string('B'+count) + strconv.Itoa(i+2)
+		f.SetCellInt(sheetName, a, storeMap[region.Leader.StoreId])
+		// set read metrics
+		a = string('B'+count+1) + strconv.Itoa(i+2)
+		f.SetCellStr(sheetName, a, region.StartKey)
+		a = string('B'+count+2) + strconv.Itoa(i+2)
+		f.SetCellStr(sheetName, a, region.EndKey)
+
+		for _, peer := range region.Peers {
+			index := storeMap[peer.StoreId]
+			a = string('B'+int8(index)) + strconv.Itoa(i+2)
+			f.SetCellInt(sheetName, a, 1)
+		}
+	}
+	f.SetActiveSheet(sheet)
+	if err := f.SaveAs("region.csv"); err != nil {
+		return err
+	}
+	return nil
 }
 
 func print(stores []*StoreInfo, regions []*RegionInfo) {
