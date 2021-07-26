@@ -2,6 +2,7 @@ package command
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -42,12 +43,16 @@ func newReadHotExportCommand() *cobra.Command {
 	}
 	return cmd
 }
+
 func newWriteHotExportCommand() *cobra.Command {
-	defaultHotType = Write
+	pre := func(cmd *cobra.Command, args []string) {
+		defaultHotType = Write
+	}
 	cmd := &cobra.Command{
-		Use:   "write",
-		Short: "export hot write regions info ",
-		Run:   ShowRegionDistributionFnc,
+		Use:    "write",
+		Short:  "export hot write regions info ",
+		Run:    ShowRegionDistributionFnc,
+		PreRun: pre,
 	}
 	return cmd
 }
@@ -69,7 +74,7 @@ func ShowRegionDistributionFnc(cmd *cobra.Command, args []string) {
 	}
 	err = export.export()
 	if err != nil {
-		cmd.Printf("get regions info error :%s \n", err)
+		cmd.Printf("export regions info error :%s \n", err)
 	}
 }
 
@@ -119,6 +124,7 @@ func NewHotRegionExport(pd string, stores *StoresInfo, regions *RegionsInfo) *St
 }
 
 func (h *StoreInfos) prepare() error {
+	fmt.Printf("url:%s \n", h.pd+h.topReadPath)
 	res, err := http.Get(h.pd + h.topReadPath)
 	if err != nil {
 		return err
@@ -152,16 +158,16 @@ func mapRegion(regions *RegionsInfo) map[uint64]*RegionInfo {
 
 func (h *StoreInfos) export() error {
 	f := excelize.NewFile()
-	sheet := f.NewSheet("hot region")
-	f.SetCellValue("hot region", "A2", "test")
+	sheetName := "hot-region"
+	sheet := f.NewSheet(sheetName)
 	count := len(h.storeDic)
 
 	a := string('B'+int8(count)) + strconv.Itoa(1)
-	f.SetCellStr("hot region", a, "leader")
+	f.SetCellStr(sheetName, a, "leader")
 	for k, v := range []string{"read_bytes", "read_keys", "read_qps", "write_bytes", "write_bytes", "write_qps",
 		"start_key", "end_key", "table", "is_index"} {
 		a = string('B'+int8(count+k+1)) + strconv.Itoa(1)
-		f.SetCellStr("hot region", a, v)
+		f.SetCellStr(sheetName, a, v)
 	}
 
 	regionCount := 1
@@ -169,44 +175,64 @@ func (h *StoreInfos) export() error {
 	for id, store := range h.StoreHotPeersStat.AsLeader {
 		storeID, _ := strconv.Atoi(id)
 		a = string('B'+int8(h.storeDic[uint64(storeID)])) + strconv.Itoa(1)
-		f.SetCellInt("hot region", a, storeID)
+		f.SetCellInt(sheetName, a, storeID)
 		for _, region := range store.Stats {
 			regionCount++
 			// set regionID
 			a = string('A') + strconv.Itoa(regionCount)
-			f.SetCellInt("hot region", a, int(region.RegionID))
+			f.SetCellInt(sheetName, a, int(region.RegionID))
 
 			// set region leader
 			a = string('B'+count) + strconv.Itoa(regionCount)
-			f.SetCellInt("hot region", a, h.storeDic[uint64(storeID)])
+			f.SetCellInt(sheetName, a, h.storeDic[uint64(storeID)])
 
 			// set  read metrics
 			if defaultHotType == Read {
 				for k, v := range []float64{region.ByteRate, region.KeyRate, region.QueryRate} {
 					a = string('B'+count+k+1) + strconv.Itoa(regionCount)
-					f.SetCellFloat("hot region", a, v, 2, 32)
+					f.SetCellFloat(sheetName, a, v, 2, 32)
 				}
 			} else {
 				for k, v := range []float64{region.ByteRate, region.KeyRate, region.QueryRate} {
 					a = string('B'+count+k+1+3) + strconv.Itoa(regionCount)
-					f.SetCellFloat("hot region", a, v, 2, 32)
+					f.SetCellFloat(sheetName, a, v, 2, 32)
 				}
 			}
 
 			regionInfo := h.regionDic[region.RegionID]
 			// set read metrics
 			a = string('B'+count+7) + strconv.Itoa(regionCount)
-			f.SetCellStr("hot region", a, regionInfo.StartKey)
+			f.SetCellStr(sheetName, a, regionInfo.StartKey)
 			a = string('B'+count+8) + strconv.Itoa(regionCount)
-			f.SetCellStr("hot region", a, regionInfo.EndKey)
+			f.SetCellStr(sheetName, a, regionInfo.EndKey)
 
 			for _, peer := range regionInfo.Peers {
 				index := h.storeDic[peer.StoreId]
 				a = string('B'+int8(index)) + strconv.Itoa(regionCount)
-				f.SetCellInt("hot region", a, 1)
+				f.SetCellInt(sheetName, a, 1)
 			}
 		}
 	}
+
+	// set total metrics
+	for _, v := range []string{"total_bytes", "total_keys", "total_qps"} {
+		regionCount++
+		a = string('A') + strconv.Itoa(regionCount)
+		f.SetCellStr(sheetName, a, v)
+		for id, store := range h.StoreHotPeersStat.AsLeader {
+			storeID, _ := strconv.Atoi(id)
+			a = string('B'+int8(h.storeDic[uint64(storeID)])) + strconv.Itoa(regionCount)
+			switch v {
+			case "total_bytes":
+				f.SetCellFloat(sheetName, a, store.TotalBytesRate, 2, 32)
+			case "total_keys":
+				f.SetCellFloat(sheetName, a, store.TotalKeysRate, 2, 32)
+			case "total_qps":
+				f.SetCellFloat(sheetName, a, store.TotalQueryRate, 2, 32)
+			}
+		}
+	}
+
 	f.SetActiveSheet(sheet)
 	if err := f.SaveAs("hot.csv"); err != nil {
 		return err
