@@ -10,24 +10,48 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type hotType string
+
+const (
+	// Initiated by admin.
+	Read hotType = "/hotspot/regions/read"
+	// Initiated by merge checker or merge scheduler. Note that it may not include region merge.
+	// the order describe the operator's producer and is very helpful to decouple scheduler or checker limit
+	Write hotType = "/hotspot/regions/write"
+)
+
+var defaultHotType = Read
+
 // NewHotRegionCommand
 func NewHotRegionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hot",
-		Short: "show hot region info of the cluster",
+		Short: "export hot region info of the cluster",
 	}
-	cmd.AddCommand(newHotExportCommand())
+	cmd.AddCommand(
+		newReadHotExportCommand(),
+		newWriteHotExportCommand())
 	return cmd
 }
 
-func newHotExportCommand() *cobra.Command {
+func newReadHotExportCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "export",
-		Short: "export regions info ",
+		Use:   "read",
+		Short: "export hot read regions info ",
 		Run:   ShowRegionDistributionFnc,
 	}
 	return cmd
 }
+func newWriteHotExportCommand() *cobra.Command {
+	defaultHotType = Write
+	cmd := &cobra.Command{
+		Use:   "write",
+		Short: "export hot write regions info ",
+		Run:   ShowRegionDistributionFnc,
+	}
+	return cmd
+}
+
 func ShowRegionDistributionFnc(cmd *cobra.Command, args []string) {
 	stores, err := GetStoresInfo(cmd)
 	if err != nil {
@@ -88,7 +112,7 @@ func NewHotRegionExport(pd string, stores *StoresInfo, regions *RegionsInfo) *St
 	regionDic := mapRegion(regions)
 	return &StoreInfos{
 		pd:          pd,
-		topReadPath: "/pd/api/v1/" + "/hotspot/regions/read",
+		topReadPath: "/pd/api/v1/" + string(defaultHotType),
 		storeDic:    storeDic,
 		regionDic:   regionDic,
 	}

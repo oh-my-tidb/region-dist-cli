@@ -1,21 +1,22 @@
-region-dist-cli
---
+# region-dist-cli
 
 Visualize region distribution of a [TiDB](https://github.com/pingcap/tidb) Cluster.
 
 ![Screenshot](screenshot.png)
 
-Screen record:
-https://asciinema.org/a/hwmxyMkpoQioTqEtmCHAtiUPM
-
-Usage:
-
+## Usage:
+1. compile:
 ```bash
-> go get github.com/disksing/region-dist-cli
-> region-dist-cli -pd="127.0.0.1:2379"
+go get github.com/disksing/region-dist-cli
 ```
 
-Watch:
+2. show region distribute 
 ```bash
-> watch -c region-dist-cli
+region-dist-cli region print 
+
+```
+
+3. export hot region info
+```bash
+./region-dist-cli hot write/read
 ```
