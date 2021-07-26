@@ -156,29 +156,3 @@ func (h *StoreInfos) export() error {
 			a = string('B'+count) + strconv.Itoa(regionCount)
 			f.SetCellInt("hot region", a, h.storeDic[uint64(storeID)])
 
-			// set  read metrics
-			for k, v := range []float64{region.ByteRate, region.KeyRate, region.QueryRate} {
-				a = string('B'+count+k+1) + strconv.Itoa(regionCount)
-				f.SetCellFloat("hot region", a, v, 2, 32)
-			}
-
-			regionInfo := h.regionDic[region.RegionID]
-			// set read metrics
-			a = string('B'+count+7) + strconv.Itoa(regionCount)
-			f.SetCellStr("hot region", a, regionInfo.StartKey)
-			a = string('B'+count+8) + strconv.Itoa(regionCount)
-			f.SetCellStr("hot region", a, regionInfo.EndKey)
-
-			for _, peer := range regionInfo.Peers {
-				index := h.storeDic[peer.StoreId]
-				a = string('B'+int8(index)) + strconv.Itoa(regionCount)
-				f.SetCellInt("hot region", a, 1)
-			}
-		}
-	}
-	f.SetActiveSheet(sheet)
-	if err := f.SaveAs("hot.xlsx"); err != nil {
-		return err
-	}
-	return nil
-}
