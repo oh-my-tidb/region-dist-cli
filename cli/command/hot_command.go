@@ -161,8 +161,8 @@ func (h *StoreInfos) export() error {
 	sheetName := "hot-region"
 	sheet := f.NewSheet(sheetName)
 	count := len(h.storeDic)
-	a := strconv.Itoa(int('B'+int8(count))) + strconv.Itoa(1)
-	_ = f.SetCellStr(sheetName, a, "leader")
+	a := ""
+	_ = f.SetCellStr(sheetName, "A1", "region")
 	for k, v := range []string{"lead", "read_bytes", "read_keys", "read_qps", "write_bytes", "write_bytes", "write_qps",
 		"start_key", "end_key", "table", "is_index"} {
 		a = string(rune('B'+count+k)) + strconv.Itoa(1)
