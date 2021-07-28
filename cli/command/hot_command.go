@@ -207,7 +207,8 @@ func (h *StoreInfos) export() error {
 
 			for _, peer := range regionInfo.Peers {
 				index := h.storeDic[peer.StoreId]
-				a = strconv.Itoa(int('B'+int8(index))) + strconv.Itoa(regionCount)
+				a = string(rune('B'+int8(index))) + strconv.Itoa(regionCount)
+
 				_ = f.SetCellInt(sheetName, a, 1)
 			}
 		}
@@ -220,7 +221,7 @@ func (h *StoreInfos) export() error {
 		_ = f.SetCellStr(sheetName, a, v)
 		for id, store := range h.StoreHotPeersStat.AsLeader {
 			storeID, _ := strconv.Atoi(id)
-			a = strconv.Itoa(int('B'+int8(h.storeDic[uint64(storeID)]))) + strconv.Itoa(regionCount)
+			a = string('B'+int8(h.storeDic[uint64(storeID)])) + strconv.Itoa(regionCount)
 			switch v {
 			case "total_bytes":
 				_ = f.SetCellFloat(sheetName, a, store.TotalBytesRate, 2, 32)
